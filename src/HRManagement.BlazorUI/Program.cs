@@ -20,27 +20,39 @@ builder.Services.AddScoped(sp =>
     var navigationManager = sp.GetRequiredService<NavigationManager>();
     return new HttpClient { BaseAddress = new Uri(navigationManager.BaseUri) };
 });
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+string connectionString;
+bool isPostgres;
+
 if (!string.IsNullOrEmpty(databaseUrl))
 {
     var databaseUri = new Uri(databaseUrl);
     var userInfo = databaseUri.UserInfo.Split(':');
     connectionString = $"Host={databaseUri.Host};Port={databaseUri.Port};Database={databaseUri.LocalPath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+    isPostgres = true;
+    Console.WriteLine($"Using PostgreSQL from DATABASE_URL: Host={databaseUri.Host}");
 }
-if (string.IsNullOrEmpty(connectionString))
+else
 {
-    throw new InvalidOperationException("Database connection string 'DefaultConnection' not found.");
+    connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (string.IsNullOrEmpty(connectionString))
+    {
+        throw new InvalidOperationException("Database connection string 'DefaultConnection' not found.");
+    }
+    isPostgres = connectionString.Contains("Host=");
+    Console.WriteLine($"Using connection string from appsettings.json");
 }
-var isPostgres = connectionString.Contains("Host=");
 builder.Services.AddDbContext<HRManagementDbContext>(options =>
 {
+    Console.WriteLine($"Configuring DbContext - IsPostgres: {isPostgres}");
     if (isPostgres)
     {
+        Console.WriteLine("Using Npgsql (PostgreSQL)");
         options.UseNpgsql(connectionString);
     }
     else
     {
+        Console.WriteLine("Using SQL Server");
         options.UseSqlServer(connectionString);
     }
 });
@@ -86,28 +98,40 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<AuthenticationStateProvider, HRManagement.BlazorUI.IdentityRevalidatingAuthenticationStateProvider>();
 var app = builder.Build();
+Console.WriteLine("=== Starting database initialization ===");
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var logger = services.GetRequiredService<ILogger<Program>>();
     try
     {
+        Console.WriteLine("Getting DbContext...");
         var context = services.GetRequiredService<HRManagementDbContext>();
         var userManager = services.GetRequiredService<UserManager<Employee>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+        
+        Console.WriteLine("Applying database migrations...");
         logger.LogInformation("Applying database migrations...");
         await context.Database.MigrateAsync();
+        Console.WriteLine("Database migrations applied successfully!");
         logger.LogInformation("Database migrations applied successfully.");
+        
+        Console.WriteLine("Seeding database with initial data...");
         logger.LogInformation("Seeding database with initial data...");
         var seeder = new DbSeeder(context, userManager, roleManager);
         await seeder.SeedAsync();
+        Console.WriteLine("Database seeded successfully!");
         logger.LogInformation("Database seeded successfully.");
     }
     catch (Exception ex)
     {
+        Console.WriteLine($"ERROR during database initialization: {ex.Message}");
+        Console.WriteLine($"Stack trace: {ex.StackTrace}");
         logger.LogError(ex, "An error occurred while initializing the database.");
+        throw;
     }
 }
+Console.WriteLine("=== Database initialization complete ===");
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
