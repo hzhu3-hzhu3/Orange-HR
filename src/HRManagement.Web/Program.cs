@@ -20,7 +20,6 @@ builder.Services.AddControllers();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddFluentValidationClientsideAdapters();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateLeaveRequestValidator>();
-builder.Services.AddOpenApi();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -89,10 +88,6 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     await app.InitializeDatabaseAsync();
-}
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
 }
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseHttpsRedirection();

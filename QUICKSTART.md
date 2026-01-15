@@ -1,5 +1,9 @@
 # 🚀 快速部署到 Railway
 
+## ✅ 已修复 .NET 版本问题
+
+项目已降级到 .NET 8.0，完全兼容 Railway！详情见 [FIXED_NET8.md](./FIXED_NET8.md)
+
 ## 5 分钟部署指南
 
 ### 第 1 步：推送到 GitHub (2 分钟)
