@@ -1,0 +1,286 @@
+@page "/approvals"
+@rendermode InteractiveServer
+@using HRManagement.Application.Interfaces
+@using HRManagement.Domain.Enums
+@using System.Security.Claims
+@attribute [Authorize(Roles = "Manager,HR")]
+@inject ILeaveRequestService LeaveRequestService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+<PageTitle>Pending Approvals - HR Management</PageTitle>
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="bi bi-hourglass-split"></i> Pending Approvals</h1>
+            <p class="page-subtitle">Review and approve leave requests from your team</p>
+        </div>
+    </div>
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle"></i> @errorMessage
+        </div>
+    }
+    else if (!pendingRequests.Any())
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No pending approvals at this time.
+        </div>
+    }
+    else
+    {
+        <div class="content-card">
+            <div class="content-card-body">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Days</th>
+                                <th>Reason</th>
+                                <th>Submitted</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var request in pendingRequests)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong>@request.EmployeeName</strong>
+                                    </td>
+                                    <td>@request.StartDate.ToString("MMM dd, yyyy")</td>
+                                    <td>@request.EndDate.ToString("MMM dd, yyyy")</td>
+                                    <td>@((request.EndDate - request.StartDate).Days + 1)</td>
+                                    <td>@request.Reason</td>
+                                    <td>@request.SubmittedAt.ToString("MMM dd, yyyy")</td>
+                                    <td>
+                                        <span class="badge bg-warning">
+                                            @request.Status
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (processingRequestId == request.Id)
+                                        {
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Processing...</span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-success me-2" 
+                                                    @onclick="() => ApproveRequest(request.Id)"
+                                                    disabled="@(processingRequestId != Guid.Empty)">
+                                                <i class="bi bi-check-circle"></i> Approve
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" 
+                                                    @onclick="() => ShowRejectModal(request.Id)"
+                                                    disabled="@(processingRequestId != Guid.Empty)">
+                                                <i class="bi bi-x-circle"></i> Reject
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success mt-3">
+            <i class="bi bi-check-circle"></i> @successMessage
+        </div>
+    }
+</div>
+<!-- Reject Modal -->
+@if (showRejectModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reject Leave Request</h5>
+                    <button type="button" class="btn-close" @onclick="CloseRejectModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="rejectionReason" class="form-label">Rejection Reason</label>
+                        <textarea id="rejectionReason" 
+                                  class="form-control" 
+                                  rows="4" 
+                                  @bind="rejectionReason"
+                                  placeholder="Please provide a reason for rejection..."></textarea>
+                    </div>
+                    @if (!string.IsNullOrEmpty(rejectErrorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            @rejectErrorMessage
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseRejectModal">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmReject" disabled="@isProcessingReject">
+                        @if (isProcessingReject)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Rejecting...</span>
+                        }
+                        else
+                        {
+                            <span><i class="bi bi-x-circle"></i> Reject Request</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@code {
+    private List<Application.DTOs.LeaveRequestDto> pendingRequests = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string? successMessage;
+    private Guid currentUserId;
+    private Guid processingRequestId = Guid.Empty;
+    private bool showRejectModal = false;
+    private Guid requestToReject = Guid.Empty;
+    private string rejectionReason = "";
+    private string? rejectErrorMessage;
+    private bool isProcessingReject = false;
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (Guid.TryParse(userIdClaim, out var userId))
+                {
+                    currentUserId = userId;
+                    await LoadPendingRequests();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading approvals: {ex.Message}";
+            Console.WriteLine($"Error in Approvals page: {ex}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    private async Task LoadPendingRequests()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var userRole = user.FindFirst(ClaimTypes.Role)?.Value;
+            if (userRole == "HR")
+            {
+                pendingRequests = (await LeaveRequestService.GetPendingRequestsForHRAsync(currentUserId)).ToList();
+            }
+            else
+            {
+                pendingRequests = (await LeaveRequestService.GetPendingRequestsForManagerAsync(currentUserId)).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load pending requests: {ex.Message}";
+            Console.WriteLine($"Error loading pending requests: {ex}");
+        }
+    }
+    private async Task ApproveRequest(Guid requestId)
+    {
+        processingRequestId = requestId;
+        errorMessage = null;
+        successMessage = null;
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var userRole = user.FindFirst(ClaimTypes.Role)?.Value;
+            if (userRole == "HR")
+            {
+                await LeaveRequestService.ApproveRequestAsHRAsync(requestId, currentUserId);
+            }
+            else
+            {
+                await LeaveRequestService.ApproveRequestAsManagerAsync(requestId, currentUserId);
+            }
+            successMessage = "Leave request approved successfully!";
+            await LoadPendingRequests();
+            await Task.Delay(3000);
+            successMessage = null;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to approve request: {ex.Message}";
+        }
+        finally
+        {
+            processingRequestId = Guid.Empty;
+        }
+    }
+    private void ShowRejectModal(Guid requestId)
+    {
+        requestToReject = requestId;
+        rejectionReason = "";
+        rejectErrorMessage = null;
+        showRejectModal = true;
+    }
+    private void CloseRejectModal()
+    {
+        showRejectModal = false;
+        requestToReject = Guid.Empty;
+        rejectionReason = "";
+        rejectErrorMessage = null;
+    }
+    private async Task ConfirmReject()
+    {
+        if (string.IsNullOrWhiteSpace(rejectionReason))
+        {
+            rejectErrorMessage = "Please provide a reason for rejection.";
+            return;
+        }
+        isProcessingReject = true;
+        rejectErrorMessage = null;
+        try
+        {
+            await LeaveRequestService.RejectRequestAsManagerAsync(requestToReject, currentUserId, rejectionReason);
+            successMessage = "Leave request rejected successfully.";
+            CloseRejectModal();
+            await LoadPendingRequests();
+            await Task.Delay(3000);
+            successMessage = null;
+        }
+        catch (Exception ex)
+        {
+            rejectErrorMessage = $"Failed to reject request: {ex.Message}";
+        }
+        finally
+        {
+            isProcessingReject = false;
+        }
+    }
+}

@@ -1,0 +1,225 @@
+@page "/profile"
+@page "/profile/{EmployeeId:guid}"
+@rendermode InteractiveServer
+@using HRManagement.Application.Interfaces
+@using HRManagement.Domain.Enums
+@using System.Security.Claims
+@attribute [Authorize]
+@inject IEmployeeService EmployeeService
+@inject ILeaveRequestService LeaveRequestService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+<PageTitle>My Profile - HR Management</PageTitle>
+<div class="page-container">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="bi bi-person-circle"></i> 
+            @if (EmployeeId.HasValue && EmployeeId.Value != currentUserId)
+            {
+                <span>Employee Profile</span>
+            }
+            else
+            {
+                <span>My Profile</span>
+            }
+        </h1>
+    </div>
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (employee == null)
+    {
+        <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle"></i> Unable to load profile information.
+        </div>
+    }
+    else
+    {
+        <div class="content-card">
+            <div class="content-card-body">
+                <div class="form-group-readonly">
+                    <label class="form-label-readonly">Name</label>
+                    <p class="form-value">@employee.Name</p>
+                </div>
+                <div class="form-group-readonly">
+                    <label class="form-label-readonly">Email</label>
+                    <p class="form-value">@employee.Email</p>
+                </div>
+                <div class="form-row">
+                    <div class="form-group-readonly">
+                        <label class="form-label-readonly">Role</label>
+                        <p class="form-value">
+                            <span class="badge bg-primary">@employee.Role</span>
+                        </p>
+                    </div>
+                    <div class="form-group-readonly">
+                        <label class="form-label-readonly">Status</label>
+                        <p class="form-value">
+                            <span class="badge @GetStatusBadgeClass(employee.Status)">
+                                @employee.Status
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(employee.TeamName))
+                {
+                    <div class="form-group-readonly">
+                        <label class="form-label-readonly">Team</label>
+                        <p class="form-value">@employee.TeamName</p>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(employee.ManagerName))
+                {
+                    <div class="form-group-readonly">
+                        <label class="form-label-readonly">Manager</label>
+                        <p class="form-value">@employee.ManagerName</p>
+                    </div>
+                }
+            </div>
+        </div>
+        <!-- Leave Balance Section -->
+        @if (leaveBalance != null)
+        {
+            <div class="content-card mt-4">
+                <div class="content-card-header">
+                    <h3 class="content-card-title"><i class="bi bi-calendar3"></i> Leave Balance (@DateTime.Now.Year)</h3>
+                </div>
+                <div class="content-card-body">
+                    <div class="balance-grid">
+                        <div class="balance-item">
+                            <div class="balance-value text-primary">@leaveBalance.TotalDays</div>
+                            <div class="balance-label">Total Days</div>
+                        </div>
+                        <div class="balance-item">
+                            <div class="balance-value text-success">@leaveBalance.RemainingDays</div>
+                            <div class="balance-label">Remaining</div>
+                        </div>
+                        <div class="balance-item">
+                            <div class="balance-value text-danger">@leaveBalance.UsedDays</div>
+                            <div class="balance-label">Used</div>
+                        </div>
+                        <div class="balance-item">
+                            <div class="balance-value text-warning">@leaveBalance.PendingDays</div>
+                            <div class="balance-label">Pending</div>
+                        </div>
+                    </div>
+                    <div class="balance-progress-container">
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar bg-danger" role="progressbar" 
+                                 style="width: @GetUsedPercentage()%" 
+                                 aria-valuenow="@leaveBalance.UsedDays" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="@leaveBalance.TotalDays">
+                                @if (leaveBalance.UsedDays > 0)
+                                {
+                                    <span>@leaveBalance.UsedDays</span>
+                                }
+                            </div>
+                            <div class="progress-bar bg-warning" role="progressbar" 
+                                 style="width: @GetPendingPercentage()%" 
+                                 aria-valuenow="@leaveBalance.PendingDays" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="@leaveBalance.TotalDays">
+                                @if (leaveBalance.PendingDays > 0)
+                                {
+                                    <span>@leaveBalance.PendingDays</span>
+                                }
+                            </div>
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: @GetRemainingPercentage()%" 
+                                 aria-valuenow="@leaveBalance.RemainingDays" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="@leaveBalance.TotalDays">
+                                @if (leaveBalance.RemainingDays > 0)
+                                {
+                                    <span>@leaveBalance.RemainingDays</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="balance-legend">
+                            <span><span class="legend-dot bg-danger"></span> Used</span>
+                            <span><span class="legend-dot bg-warning"></span> Pending</span>
+                            <span><span class="legend-dot bg-success"></span> Available</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        <div class="mt-4">
+            <a href="/" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    }
+</div>
+@code {
+    [Parameter]
+    public Guid? EmployeeId { get; set; }
+    private Application.DTOs.EmployeeDto? employee;
+    private Application.DTOs.LeaveBalanceDto? leaveBalance;
+    private bool isLoading = true;
+    private Guid currentUserId;
+    private Guid targetEmployeeId;
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (Guid.TryParse(userIdClaim, out var userId))
+                {
+                    currentUserId = userId;
+                    targetEmployeeId = EmployeeId ?? currentUserId;
+                    employee = await EmployeeService.GetEmployeeByIdAsync(targetEmployeeId, currentUserId);
+                    try
+                    {
+                        leaveBalance = await LeaveRequestService.GetEmployeeLeaveBalanceAsync(targetEmployeeId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error loading leave balance: {ex.Message}");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading profile: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    private string GetStatusBadgeClass(EmploymentStatus status)
+    {
+        return status switch
+        {
+            EmploymentStatus.Active => "bg-success",
+            EmploymentStatus.Inactive => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+    private double GetUsedPercentage()
+    {
+        if (leaveBalance == null || leaveBalance.TotalDays == 0) return 0;
+        return (double)leaveBalance.UsedDays / leaveBalance.TotalDays * 100;
+    }
+    private double GetPendingPercentage()
+    {
+        if (leaveBalance == null || leaveBalance.TotalDays == 0) return 0;
+        return (double)leaveBalance.PendingDays / leaveBalance.TotalDays * 100;
+    }
+    private double GetRemainingPercentage()
+    {
+        if (leaveBalance == null || leaveBalance.TotalDays == 0) return 0;
+        return (double)leaveBalance.RemainingDays / leaveBalance.TotalDays * 100;
+    }
+}

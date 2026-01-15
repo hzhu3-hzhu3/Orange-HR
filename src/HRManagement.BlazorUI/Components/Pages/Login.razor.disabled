@@ -1,0 +1,375 @@
+@page "/login"
+@layout EmptyLayout
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Identity
+@using HRManagement.Domain.Entities
+@using System.ComponentModel.DataAnnotations
+@inject SignInManager<Employee> SignInManager
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Login - Orange HR</PageTitle>
+
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+    }
+
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #FFA500 0%, #FF8C00 100%);
+        padding: 40px 20px;
+    }
+
+    .login-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        width: 100%;
+        max-width: 900px;
+        padding: 60px 80px;
+    }
+
+    .brand-section {
+        text-align: center;
+        margin-bottom: 48px;
+    }
+
+    .brand-icon {
+        font-size: 64px;
+        margin-bottom: 20px;
+        line-height: 1;
+    }
+
+    .brand-title {
+        font-size: 32px;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 8px;
+    }
+
+    .brand-slogan {
+        font-size: 16px;
+        color: #718096;
+        font-weight: 400;
+        line-height: 1.5;
+    }
+
+    .login-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 60px;
+        align-items: start;
+    }
+
+    .login-form-section {
+        padding-right: 20px;
+    }
+
+    .login-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1a202c;
+        margin-bottom: 32px;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 8px;
+        font-size: 14px;
+        display: block;
+    }
+
+    .form-control {
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-size: 15px;
+        transition: all 0.2s ease;
+        width: 100%;
+    }
+
+    .form-control:focus {
+        border-color: #FFA500;
+        box-shadow: 0 0 0 3px rgba(255, 165, 0, 0.1);
+        outline: none;
+    }
+
+    .btn-login {
+        background: linear-gradient(135deg, #FFA500 0%, #FF8C00 100%);
+        border: none;
+        border-radius: 8px;
+        padding: 14px;
+        font-size: 16px;
+        font-weight: 600;
+        color: white;
+        width: 100%;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(255, 165, 0, 0.4);
+        cursor: pointer;
+    }
+
+    .btn-login:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(255, 165, 0, 0.5);
+    }
+
+    .btn-login:active:not(:disabled) {
+        transform: translateY(0);
+    }
+
+    .btn-login:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .alert {
+        border-radius: 8px;
+        border: none;
+        padding: 12px 16px;
+        margin-bottom: 20px;
+    }
+
+    .demo-accounts-section {
+        padding-left: 20px;
+        border-left: 2px solid #e2e8f0;
+    }
+
+    .demo-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #718096;
+        margin-bottom: 20px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .demo-account {
+        background: #f7fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+        transition: all 0.2s ease;
+    }
+
+    .demo-account:hover {
+        background: #edf2f7;
+        border-color: #cbd5e0;
+        transform: translateX(4px);
+    }
+
+    .demo-role {
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 6px;
+        font-size: 15px;
+    }
+
+    .demo-email {
+        color: #718096;
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+
+    .demo-password {
+        font-family: 'Courier New', monospace;
+        color: #4a5568;
+        font-size: 12px;
+        background: #e2e8f0;
+        padding: 6px 10px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+
+    /* Responsive Design */
+    @@media (max-width: 992px) {
+        .login-card {
+            padding: 50px 60px;
+        }
+
+        .login-content {
+            gap: 40px;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .login-card {
+            padding: 40px 30px;
+            max-width: 600px;
+        }
+
+        .login-content {
+            grid-template-columns: 1fr;
+            gap: 40px;
+        }
+
+        .demo-accounts-section {
+            padding-left: 0;
+            padding-top: 40px;
+            border-left: none;
+            border-top: 2px solid #e2e8f0;
+        }
+
+        .login-form-section {
+            padding-right: 0;
+        }
+    }
+
+    @@media (max-width: 576px) {
+        .login-container {
+            padding: 20px 16px;
+        }
+
+        .login-card {
+            padding: 32px 24px;
+        }
+
+        .brand-icon {
+            font-size: 56px;
+        }
+
+        .brand-title {
+            font-size: 26px;
+        }
+
+        .brand-slogan {
+            font-size: 14px;
+        }
+
+        .login-title {
+            font-size: 20px;
+        }
+    }
+</style>
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="brand-section">
+            <div class="brand-icon">🍊</div>
+            <h1 class="brand-title">Orange HR</h1>
+            <p class="brand-slogan">Making everyday HR work more effective.</p>
+        </div>
+
+        <div class="login-content">
+            <div class="login-form-section">
+                <h2 class="login-title">Welcome Back</h2>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>@errorMessage
+                    </div>
+                }
+
+                <EditForm Model="loginModel" OnValidSubmit="HandleLogin" FormName="loginForm">
+                    <DataAnnotationsValidator />
+
+                    <div class="mb-3">
+                        <label class="form-label">Email Address</label>
+                        <InputText @bind-Value="loginModel.Email" class="form-control" placeholder="your.email@orange.com" />
+                        <ValidationMessage For="() => loginModel.Email" class="text-danger" />
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Password</label>
+                        <InputText type="password" @bind-Value="loginModel.Password" class="form-control" placeholder="Enter your password" />
+                        <ValidationMessage For="() => loginModel.Password" class="text-danger" />
+                    </div>
+
+                    <button type="submit" class="btn btn-login" disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Signing in...</span>
+                        }
+                        else
+                        {
+                            <span>Sign In</span>
+                        }
+                    </button>
+                </EditForm>
+            </div>
+
+            <div class="demo-accounts-section">
+                <div class="demo-title">Demo Accounts</div>
+                <div class="demo-account">
+                    <div>
+                        <div class="demo-role">HR Admin</div>
+                        <div class="demo-email">sabrina.carpenter@orange.com</div>
+                    </div>
+                    <span class="demo-password">Orange123!</span>
+                </div>
+                <div class="demo-account">
+                    <div>
+                        <div class="demo-role">Manager</div>
+                        <div class="demo-email">chappell.roan@orange.com</div>
+                    </div>
+                    <span class="demo-password">Orange123!</span>
+                </div>
+                <div class="demo-account">
+                    <div>
+                        <div class="demo-role">Employee</div>
+                        <div class="demo-email">gloria.estefan@orange.com</div>
+                    </div>
+                    <span class="demo-password">Orange123!</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private LoginModel loginModel { get; set; } = new();
+
+    private string? errorMessage;
+    private bool isLoading = false;
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var result = await SignInManager.PasswordSignInAsync(
+                loginModel.Email,
+                loginModel.Password,
+                isPersistent: false,
+                lockoutOnFailure: false
+            );
+
+            if (result.Succeeded)
+            {
+                // Use JavaScript to reload the page, which will trigger authentication redirect
+                await JS.InvokeVoidAsync("eval", "window.location.href = '/'");
+            }
+            else
+            {
+                errorMessage = "Invalid email or password. Please try again.";
+                isLoading = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+            isLoading = false;
+        }
+    }
+
+    public class LoginModel
+    {
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Invalid email address")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Password is required")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

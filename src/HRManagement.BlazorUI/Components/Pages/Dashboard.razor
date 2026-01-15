@@ -1,0 +1,374 @@
+@page "/"
+@rendermode InteractiveServer
+@using HRManagement.Application.Interfaces
+@using HRManagement.Domain.Entities
+@using HRManagement.Domain.Enums
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@attribute [Authorize]
+@inject IEmployeeService EmployeeService
+@inject ILeaveRequestService LeaveRequestService
+@inject IDashboardService DashboardService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+<PageTitle>Dashboard - HR Management</PageTitle>
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </h1>
+            <p class="page-subtitle">Welcome back, @currentUserName (@currentUserRole)</p>
+        </div>
+    </div>
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="stats-grid">
+            <!-- Employee Dashboard -->
+            @if (currentUserRole == "Employee" && employeeStats != null)
+            {
+                <!-- Leave Balance Card -->
+                <div class="stat-card-full">
+                    <div class="stat-card-header">
+                        <h3 class="stat-card-title"><i class="bi bi-calendar3"></i> Leave Balance @DateTime.Now.Year</h3>
+                    </div>
+                    @if (leaveBalance != null)
+                    {
+                        <div class="balance-grid">
+                            <div class="balance-item">
+                                <div class="balance-value text-primary">@leaveBalance.TotalDays</div>
+                                <div class="balance-label">Total Days</div>
+                            </div>
+                            <div class="balance-item">
+                                <div class="balance-value text-success">@leaveBalance.RemainingDays</div>
+                                <div class="balance-label">Remaining</div>
+                            </div>
+                            <div class="balance-item">
+                                <div class="balance-value text-danger">@leaveBalance.UsedDays</div>
+                                <div class="balance-label">Used</div>
+                            </div>
+                            <div class="balance-item">
+                                <div class="balance-value text-warning">@leaveBalance.PendingDays</div>
+                                <div class="balance-label">Pending</div>
+                            </div>
+                        </div>
+                        <div class="balance-progress-container">
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-danger" style="width: @GetUsedPercentage()%"></div>
+                                <div class="progress-bar bg-warning" style="width: @GetPendingPercentage()%"></div>
+                            </div>
+                            <div class="balance-legend">
+                                <span><span class="legend-dot bg-danger"></span> Used: @leaveBalance.UsedDays days</span>
+                                <span><span class="legend-dot bg-warning"></span> Pending: @leaveBalance.PendingDays days</span>
+                                <span><span class="legend-dot bg-success"></span> Available: @leaveBalance.RemainingDays days</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Loading balance...</p>
+                    }
+                </div>
+                <!-- Statistics Cards -->
+                <div class="stat-card">
+                    <div class="stat-value text-primary">@employeeStats.TotalLeaveRequests</div>
+                    <div class="stat-label">Total Requests</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value text-warning">@employeeStats.PendingRequests</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value text-success">@employeeStats.ApprovedRequests</div>
+                    <div class="stat-label">Approved</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value text-danger">@employeeStats.RejectedRequests</div>
+                    <div class="stat-label">Rejected</div>
+                </div>
+                <!-- Quick Actions -->
+                <div class="action-card">
+                    <h3 class="action-card-title"><i class="bi bi-calendar-check"></i> My Leave Requests</h3>
+                    <p class="action-card-text">Manage your leave requests</p>
+                    <div class="action-buttons">
+                        <a href="/leave-requests" class="btn btn-primary">View All</a>
+                        <a href="/leave-requests/new" class="btn btn-success">New Request</a>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <h3 class="action-card-title"><i class="bi bi-person"></i> My Profile</h3>
+                    <p class="action-card-text">View and manage your profile</p>
+                    <div class="action-buttons">
+                        <a href="/profile" class="btn btn-primary">View Profile</a>
+                    </div>
+                </div>
+            }
+            <!-- Manager Dashboard -->
+            @if (currentUserRole == "Manager" && managerStats != null)
+            {
+                <!-- Manager Statistics Cards -->
+                <div class="stat-card stat-card-warning">
+                    <div class="stat-value">@managerStats.PendingApprovals</div>
+                    <div class="stat-label">Pending Approvals</div>
+                    <a href="/approvals" class="btn btn-light btn-sm mt-2">Review</a>
+                </div>
+                <div class="stat-card stat-card-primary">
+                    <div class="stat-value">@managerStats.TeamMembersCount</div>
+                    <div class="stat-label">Team Members</div>
+                </div>
+                <div class="stat-card stat-card-info">
+                    <div class="stat-value">@managerStats.TeamOnLeaveToday</div>
+                    <div class="stat-label">On Leave Today</div>
+                </div>
+                <div class="stat-card stat-card-secondary">
+                    <div class="stat-value">@managerStats.TeamOnLeaveThisWeek</div>
+                    <div class="stat-label">On Leave This Week</div>
+                </div>
+                <!-- Manager's Leave Balance -->
+                @if (leaveBalance != null)
+                {
+                    <div class="stat-card-full">
+                        <div class="stat-card-header">
+                            <h3 class="stat-card-title"><i class="bi bi-calendar3"></i> My Leave Balance @DateTime.Now.Year</h3>
+                        </div>
+                        <div class="balance-grid">
+                            <div class="balance-item">
+                                <div class="balance-value text-primary">@leaveBalance.TotalDays</div>
+                                <div class="balance-label">Total</div>
+                            </div>
+                            <div class="balance-item">
+                                <div class="balance-value text-success">@leaveBalance.RemainingDays</div>
+                                <div class="balance-label">Remaining</div>
+                            </div>
+                            <div class="balance-item">
+                                <div class="balance-value text-danger">@leaveBalance.UsedDays</div>
+                                <div class="balance-label">Used</div>
+                            </div>
+                            <div class="balance-item">
+                                <div class="balance-value text-warning">@leaveBalance.PendingDays</div>
+                                <div class="balance-label">Pending</div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                <!-- Quick Actions -->
+                <div class="action-card">
+                    <h3 class="action-card-title"><i class="bi bi-people"></i> My Team</h3>
+                    <p class="action-card-text">Manage your direct reports</p>
+                    <div class="action-buttons">
+                        <a href="/team" class="btn btn-primary">View Team</a>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <h3 class="action-card-title"><i class="bi bi-calendar-check"></i> My Requests</h3>
+                    <p class="action-card-text">View your leave requests</p>
+                    <div class="action-buttons">
+                        <a href="/leave-requests" class="btn btn-primary">View</a>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <h3 class="action-card-title"><i class="bi bi-plus-circle"></i> New Request</h3>
+                    <p class="action-card-text">Submit a leave request</p>
+                    <div class="action-buttons">
+                        <a href="/leave-requests/new" class="btn btn-success">Create</a>
+                    </div>
+                </div>
+            }
+            <!-- HR Dashboard -->
+            @if (currentUserRole == "HR" && hrStats != null)
+            {
+                <!-- HR Statistics Cards -->
+                <div class="stat-card stat-card-primary">
+                    <div class="stat-value">@hrStats.TotalEmployees</div>
+                    <div class="stat-label">Total Employees</div>
+                    <small class="text-muted">@hrStats.ActiveEmployees Active</small>
+                </div>
+                <div class="stat-card stat-card-warning">
+                    <div class="stat-value">@hrStats.PendingHRApprovals</div>
+                    <div class="stat-label">Pending HR Approval</div>
+                    <a href="/approvals" class="btn btn-light btn-sm mt-2">Review</a>
+                </div>
+                <div class="stat-card stat-card-info">
+                    <div class="stat-value">@hrStats.EmployeesOnLeaveToday</div>
+                    <div class="stat-label">On Leave Today</div>
+                </div>
+                <div class="stat-card stat-card-success">
+                    <div class="stat-value">@hrStats.TotalRequestsThisMonth</div>
+                    <div class="stat-label">Requests This Month</div>
+                    <small class="text-muted">@hrStats.ApprovedThisMonth Approved, @hrStats.RejectedThisMonth Rejected</small>
+                </div>
+                <!-- Quick Actions -->
+                <div class="action-card">
+                    <h3 class="action-card-title"><i class="bi bi-people"></i> Employees</h3>
+                    <p class="action-card-text">Manage all employees</p>
+                    <div class="action-buttons">
+                        <a href="/employees" class="btn btn-primary">Manage</a>
+                    </div>
+                </div>
+                <div class="action-card">
+                    <h3 class="action-card-title"><i class="bi bi-calendar-check"></i> Leave Requests</h3>
+                    <p class="action-card-text">View all leave requests</p>
+                    <div class="action-buttons">
+                        <a href="/leave-requests" class="btn btn-primary">View All</a>
+                    </div>
+                </div>
+            }
+        </div>
+        <!-- Recent Activity -->
+        <div class="content-card mt-4">
+            <div class="content-card-header">
+                <h3 class="content-card-title">
+                    <i class="bi bi-activity"></i> 
+                    @if (currentUserRole == "Employee")
+                    {
+                        <span>Upcoming Leave</span>
+                    }
+                    else if (currentUserRole == "Manager")
+                    {
+                        <span>Recent Team Requests</span>
+                    }
+                    else
+                    {
+                        <span>Recent Leave Requests</span>
+                    }
+                </h3>
+            </div>
+            <div class="content-card-body">
+                @if (myLeaveRequests.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    @if (currentUserRole != "Employee")
+                                    {
+                                        <th>Employee</th>
+                                    }
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Reason</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var request in myLeaveRequests.Take(10))
+                                {
+                                    <tr>
+                                        @if (currentUserRole != "Employee")
+                                        {
+                                            <td>@request.EmployeeName</td>
+                                        }
+                                        <td>@request.StartDate.ToString("MMM dd, yyyy")</td>
+                                        <td>@request.EndDate.ToString("MMM dd, yyyy")</td>
+                                        <td>@request.Reason</td>
+                                        <td>
+                                            <span class="badge @GetStatusBadgeClass(request.Status)">
+                                                @request.Status
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted">No leave requests to display</p>
+                }
+            </div>
+        </div>
+    }
+</div>
+@code {
+    private string currentUserName = "";
+    private string currentUserRole = "";
+    private Guid currentUserId;
+    private bool isLoading = true;
+    private List<Application.DTOs.LeaveRequestDto> myLeaveRequests = new();
+    private Application.DTOs.LeaveBalanceDto? leaveBalance;
+    private Application.DTOs.EmployeeDashboardStatsDto? employeeStats;
+    private Application.DTOs.ManagerDashboardStatsDto? managerStats;
+    private Application.DTOs.HRDashboardStatsDto? hrStats;
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                currentUserName = user.FindFirst(ClaimTypes.Name)?.Value ?? "User";
+                currentUserRole = user.FindFirst(ClaimTypes.Role)?.Value ?? "Employee";
+                var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (Guid.TryParse(userIdClaim, out var userId))
+                {
+                    currentUserId = userId;
+                    await LoadDashboardData();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            if (currentUserRole == "Employee")
+            {
+                employeeStats = await DashboardService.GetEmployeeStatsAsync(currentUserId);
+                leaveBalance = employeeStats.CurrentYearBalance;
+                myLeaveRequests = employeeStats.UpcomingLeave.ToList();
+            }
+            else if (currentUserRole == "Manager")
+            {
+                managerStats = await DashboardService.GetManagerStatsAsync(currentUserId);
+                leaveBalance = managerStats.MyBalance;
+                myLeaveRequests = managerStats.RecentTeamRequests.ToList();
+            }
+            else if (currentUserRole == "HR")
+            {
+                hrStats = await DashboardService.GetHRStatsAsync();
+                myLeaveRequests = hrStats.RecentRequests.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard data: {ex.Message}");
+        }
+    }
+    private double GetUsedPercentage()
+    {
+        if (leaveBalance == null || leaveBalance.TotalDays == 0) return 0;
+        return (double)leaveBalance.UsedDays / leaveBalance.TotalDays * 100;
+    }
+    private double GetPendingPercentage()
+    {
+        if (leaveBalance == null || leaveBalance.TotalDays == 0) return 0;
+        return (double)leaveBalance.PendingDays / leaveBalance.TotalDays * 100;
+    }
+    private string GetStatusBadgeClass(RequestStatus status)
+    {
+        return status switch
+        {
+            RequestStatus.Pending => "bg-warning",
+            RequestStatus.Approved => "bg-success",
+            RequestStatus.Rejected => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+}

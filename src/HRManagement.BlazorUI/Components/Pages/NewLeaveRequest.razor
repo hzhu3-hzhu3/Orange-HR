@@ -1,0 +1,201 @@
+@page "/leave-requests/new"
+@rendermode InteractiveServer
+@using HRManagement.Application.DTOs
+@using HRManagement.Application.Interfaces
+@using HRManagement.BlazorUI.Models
+@using System.Security.Claims
+@attribute [Authorize]
+@inject ILeaveRequestService LeaveRequestService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+<PageTitle>New Leave Request - HR Management</PageTitle>
+<div class="page-container">
+    <div class="page-header">
+        <h1 class="page-title"><i class="bi bi-plus-circle"></i> Submit Leave Request</h1>
+    </div>
+    <div class="form-container">
+        <div class="content-card">
+            <div class="content-card-body">
+                <!-- Leave Balance Display -->
+                @if (leaveBalance != null)
+                {
+                    <div class="balance-info-card @GetBalanceClass()">
+                        <h3 class="balance-info-title"><i class="bi bi-calendar3"></i> Your Leave Balance (@DateTime.Now.Year)</h3>
+                        <div class="balance-grid">
+                            <div class="balance-item">
+                                <div class="balance-value">@leaveBalance.TotalDays</div>
+                                <div class="balance-label">Total</div>
+                            </div>
+                            <div class="balance-item">
+                                <div class="balance-value text-success">@leaveBalance.RemainingDays</div>
+                                <div class="balance-label">Available</div>
+                            </div>
+                            <div class="balance-item">
+                                <div class="balance-value text-danger">@leaveBalance.UsedDays</div>
+                                <div class="balance-label">Used</div>
+                            </div>
+                            <div class="balance-item">
+                                <div class="balance-value text-warning">@leaveBalance.PendingDays</div>
+                                <div class="balance-label">Pending</div>
+                            </div>
+                        </div>
+                        @if (requestedDays > 0)
+                        {
+                            <div class="balance-calculation">
+                                <p class="mb-1">
+                                    <strong>Requested Days:</strong> @requestedDays days
+                                </p>
+                                @if (requestedDays > leaveBalance.RemainingDays)
+                                {
+                                    <p class="text-danger mb-0">
+                                        <i class="bi bi-exclamation-triangle"></i>
+                                        <strong>Insufficient balance!</strong> You need @requestedDays days but only have @leaveBalance.RemainingDays days available.
+                                    </p>
+                                }
+                                else
+                                {
+                                    <p class="text-success mb-0">
+                                        <i class="bi bi-check-circle"></i>
+                                        After approval, you will have <strong>@(leaveBalance.RemainingDays - requestedDays)</strong> days remaining.
+                                    </p>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i> @errorMessage
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(successMessage))
+                {
+                    <div class="alert alert-success" role="alert">
+                        <i class="bi bi-check-circle"></i> @successMessage
+                    </div>
+                }
+                <EditForm Model="@leaveRequest" OnValidSubmit="@HandleSubmit" FormName="leaveRequestForm">
+                    <DataAnnotationsValidator />
+                    <div class="form-group">
+                        <label for="startDate" class="form-label">Start Date</label>
+                        <InputDate id="startDate" class="form-input" @bind-Value="leaveRequest.StartDate" @bind-Value:after="CalculateRequestedDays" />
+                        <ValidationMessage For="@(() => leaveRequest.StartDate)" class="text-danger" />
+                    </div>
+                    <div class="form-group">
+                        <label for="endDate" class="form-label">End Date</label>
+                        <InputDate id="endDate" class="form-input" @bind-Value="leaveRequest.EndDate" @bind-Value:after="CalculateRequestedDays" />
+                        <ValidationMessage For="@(() => leaveRequest.EndDate)" class="text-danger" />
+                    </div>
+                    <div class="form-group">
+                        <label for="reason" class="form-label">Reason</label>
+                        <InputTextArea id="reason" class="form-input" rows="4" @bind-Value="leaveRequest.Reason" placeholder="Please provide a reason for your leave request..." />
+                        <ValidationMessage For="@(() => leaveRequest.Reason)" class="text-danger" />
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" @onclick="Cancel">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                            @if (isSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Submitting...</span>
+                            }
+                            else
+                            {
+                                <span><i class="bi bi-send"></i> Submit Request</span>
+                            }
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+@code {
+    [SupplyParameterFromForm]
+    private LeaveRequestFormModel leaveRequest { get; set; } = new();
+    private Application.DTOs.LeaveBalanceDto? leaveBalance;
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isSubmitting;
+    private Guid currentUserId;
+    private int requestedDays = 0;
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(userIdClaim, out var userId))
+            {
+                currentUserId = userId;
+                await LoadLeaveBalance();
+            }
+        }
+    }
+    private async Task LoadLeaveBalance()
+    {
+        try
+        {
+            leaveBalance = await LeaveRequestService.GetEmployeeLeaveBalanceAsync(currentUserId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading leave balance: {ex.Message}");
+        }
+    }
+    private void CalculateRequestedDays()
+    {
+        if (leaveRequest.StartDate != default && leaveRequest.EndDate != default && leaveRequest.EndDate >= leaveRequest.StartDate)
+        {
+            requestedDays = (leaveRequest.EndDate - leaveRequest.StartDate).Days + 1;
+        }
+        else
+        {
+            requestedDays = 0;
+        }
+    }
+    private string GetBalanceClass()
+    {
+        if (leaveBalance == null) return "";
+        if (requestedDays > leaveBalance.RemainingDays)
+            return "balance-danger";
+        if (leaveBalance.RemainingDays <= 5)
+            return "balance-warning";
+        return "";
+    }
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+        successMessage = null;
+        try
+        {
+            var dto = new CreateLeaveRequestDto(
+                leaveRequest.StartDate,
+                leaveRequest.EndDate,
+                leaveRequest.Reason
+            );
+            await LeaveRequestService.SubmitLeaveRequestAsync(dto, currentUserId);
+            successMessage = "Leave request submitted successfully!";
+            leaveRequest = new();
+            await Task.Delay(2000);
+            Navigation.NavigateTo("/leave-requests");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to submit leave request: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/leave-requests");
+    }
+}

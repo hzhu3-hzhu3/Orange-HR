@@ -1,0 +1,412 @@
+@page
+@model HRManagement.BlazorUI.Pages.LoginModel
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - Orange HR</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/bootstrap-icons/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/orange-hr-theme.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-family-base);
+        }
+
+        .login-page {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background-color: var(--color-bg-primary);
+        }
+
+        /* Hero Section - Left Side */
+        .hero-section {
+            background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 50%, #1E40AF 100%);
+            padding: var(--spacing-16);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 600px;
+            height: 600px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+        }
+
+        .hero-section::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -10%;
+            width: 400px;
+            height: 400px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 50%;
+        }
+
+        .hero-content {
+            max-width: 500px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-brand {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-3);
+            margin-bottom: var(--spacing-12);
+        }
+
+        .hero-brand-icon {
+            font-size: 3rem;
+            line-height: 1;
+        }
+
+        .hero-brand-text {
+            font-size: var(--font-size-3xl);
+            font-weight: var(--font-weight-bold);
+            color: white;
+        }
+
+        .hero-title {
+            font-size: var(--font-size-5xl);
+            font-weight: var(--font-weight-bold);
+            line-height: 1.1;
+            margin-bottom: var(--spacing-6);
+            color: white;
+        }
+
+        .hero-subtitle {
+            font-size: var(--font-size-xl);
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: var(--spacing-8);
+        }
+
+        .hero-features {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-4);
+        }
+
+        .hero-feature {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-3);
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        .hero-feature i {
+            font-size: 1.5rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* Login Section - Right Side */
+        .login-section {
+            padding: var(--spacing-16);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--color-bg-surface);
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 440px;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: var(--spacing-10);
+        }
+
+        .login-title {
+            font-size: var(--font-size-3xl);
+            font-weight: var(--font-weight-bold);
+            color: var(--color-text-primary);
+            margin-bottom: var(--spacing-2);
+        }
+
+        .login-description {
+            font-size: var(--font-size-base);
+            color: var(--color-text-secondary);
+        }
+
+        .login-form {
+            background-color: var(--color-bg-primary);
+            padding: var(--spacing-8);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .form-group {
+            margin-bottom: var(--spacing-6);
+        }
+
+        .form-label {
+            display: block;
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text-primary);
+            margin-bottom: var(--spacing-2);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: var(--spacing-3) var(--spacing-4);
+            font-size: var(--font-size-base);
+            line-height: 1.5;
+            color: var(--color-text-primary);
+            background-color: var(--color-bg-primary);
+            border: 2px solid var(--color-border-light);
+            border-radius: var(--radius-sm);
+            transition: var(--transition-fast);
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: var(--spacing-3) var(--spacing-6);
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-medium);
+            color: white;
+            background-color: var(--color-primary);
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: var(--transition-base);
+            margin-top: var(--spacing-2);
+        }
+
+        .btn-login:hover {
+            background-color: var(--color-primary-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .alert {
+            padding: var(--spacing-3) var(--spacing-4);
+            border-radius: var(--radius-sm);
+            margin-bottom: var(--spacing-4);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-2);
+        }
+
+        .alert-danger {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: var(--color-danger);
+            border-left: 4px solid var(--color-danger);
+        }
+
+        .demo-accounts {
+            margin-top: var(--spacing-8);
+            padding-top: var(--spacing-6);
+            border-top: 1px solid var(--color-border-light);
+        }
+
+        .demo-title {
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: var(--spacing-4);
+        }
+
+        .demo-account {
+            background-color: var(--color-bg-surface);
+            padding: var(--spacing-4);
+            border-radius: var(--radius-sm);
+            margin-bottom: var(--spacing-3);
+            border: 1px solid var(--color-border-light);
+            transition: var(--transition-fast);
+        }
+
+        .demo-account:hover {
+            border-color: var(--color-primary);
+            background-color: rgba(37, 99, 235, 0.02);
+        }
+
+        .demo-role {
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text-primary);
+            margin-bottom: var(--spacing-1);
+        }
+
+        .demo-email {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+            margin-bottom: var(--spacing-2);
+        }
+
+        .demo-password {
+            font-family: var(--font-family-mono);
+            font-size: var(--font-size-xs);
+            color: var(--color-primary);
+            background-color: rgba(37, 99, 235, 0.1);
+            padding: var(--spacing-1) var(--spacing-2);
+            border-radius: var(--radius-sm);
+            display: inline-block;
+        }
+
+        /* Responsive Design */
+        @@media (max-width: 1024px) {
+            .login-page {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-section {
+                padding: var(--spacing-12) var(--spacing-6);
+                min-height: 40vh;
+            }
+
+            .hero-title {
+                font-size: var(--font-size-4xl);
+            }
+
+            .login-section {
+                padding: var(--spacing-8) var(--spacing-6);
+            }
+        }
+
+        @@media (max-width: 640px) {
+            .hero-section {
+                padding: var(--spacing-8) var(--spacing-4);
+            }
+
+            .hero-title {
+                font-size: var(--font-size-3xl);
+            }
+
+            .hero-subtitle {
+                font-size: var(--font-size-lg);
+            }
+
+            .login-section {
+                padding: var(--spacing-6) var(--spacing-4);
+            }
+
+            .login-form {
+                padding: var(--spacing-6);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-page">
+        <!-- Hero Section - Left Side -->
+        <div class="hero-section">
+            <div class="hero-content">
+                <div class="hero-brand">
+                    <span class="hero-brand-icon">🍊</span>
+                    <span class="hero-brand-text">Orange HR</span>
+                </div>
+
+                <h1 class="hero-title">Work Smart, Rest Better</h1>
+                
+                <p class="hero-subtitle">
+                    Effortless leave management that puts your team first. Balance work and life with just a few clicks.
+                </p>
+
+                <div class="hero-features">
+                    <div class="hero-feature">
+                        <i class="bi bi-check-circle-fill"></i>
+                        <span>One-click leave requests</span>
+                    </div>
+                    <div class="hero-feature">
+                        <i class="bi bi-check-circle-fill"></i>
+                        <span>Instant approval notifications</span>
+                    </div>
+                    <div class="hero-feature">
+                        <i class="bi bi-check-circle-fill"></i>
+                        <span>Real-time balance tracking</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Section - Right Side -->
+        <div class="login-section">
+            <div class="login-container">
+                <div class="login-header">
+                    <h2 class="login-title">Welcome Back</h2>
+                    <p class="login-description">Sign in to your account to continue</p>
+                </div>
+
+                <div class="login-form">
+                    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <span>@Model.ErrorMessage</span>
+                        </div>
+                    }
+
+                    <form method="post">
+                        @Html.AntiForgeryToken()
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="Input_Email">Email Address</label>
+                            <input asp-for="Input.Email" id="Input_Email" name="Input.Email" class="form-control" placeholder="your.email@orange.com" autocomplete="email" />
+                            <span asp-validation-for="Input.Email" class="text-danger"></span>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="Input_Password">Password</label>
+                            <input asp-for="Input.Password" id="Input_Password" name="Input.Password" type="password" class="form-control" placeholder="Enter your password" autocomplete="current-password" />
+                            <span asp-validation-for="Input.Password" class="text-danger"></span>
+                        </div>
+
+                        <button type="submit" class="btn-login">Sign In</button>
+                    </form>
+
+                    <div class="demo-accounts">
+                        <div class="demo-title">Demo Accounts</div>
+                        <div class="demo-account">
+                            <div class="demo-role">HR Admin</div>
+                            <div class="demo-email">sarah.chen@orange.com</div>
+                            <span class="demo-password">Orange123!</span>
+                        </div>
+                        <div class="demo-account">
+                            <div class="demo-role">Manager</div>
+                            <div class="demo-email">michael.rodriguez@orange.com</div>
+                            <span class="demo-password">Orange123!</span>
+                        </div>
+                        <div class="demo-account">
+                            <div class="demo-role">Employee</div>
+                            <div class="demo-email">gloria.zhu@orange.com</div>
+                            <span class="demo-password">Orange123!</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

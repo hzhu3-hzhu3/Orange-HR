@@ -1,0 +1,289 @@
+@page "/employees"
+@rendermode InteractiveServer
+@using HRManagement.Application.DTOs
+@using HRManagement.Application.Interfaces
+@using HRManagement.Domain.Enums
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@attribute [Authorize(Roles = "HR")]
+@inject IEmployeeService EmployeeService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+<PageTitle>Employee Management</PageTitle>
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="bi bi-people-fill"></i> Employee Management</h1>
+            <p class="page-subtitle">Manage all employees in the organization</p>
+        </div>
+    </div>
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+    @if (successMessage != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>@successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+    <!-- Search and Filter Section -->
+    <div class="content-card mb-4">
+        <div class="content-card-body">
+            <div class="filter-grid">
+                <div class="form-group">
+                    <label class="form-label">Search</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-input" placeholder="Search by name or email..." 
+                               value="@searchTerm" @oninput="OnSearchChanged" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Role</label>
+                    <select class="form-input" value="@selectedRole" @onchange="OnRoleChanged">
+                        <option value="">All Roles</option>
+                        <option value="Employee">Employee</option>
+                        <option value="Manager">Manager</option>
+                        <option value="HR">HR</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-input" value="@selectedStatus" @onchange="OnStatusChanged">
+                        <option value="">All Statuses</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+                <div class="form-group filter-actions">
+                    <button class="btn btn-secondary w-100" @onclick="ClearFilters">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Employee Table -->
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading employees...</p>
+        </div>
+    }
+    else if (filteredEmployees == null || !filteredEmployees.Any())
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>No employees found matching your criteria.
+        </div>
+    }
+    else
+    {
+        <div class="content-card">
+            <div class="content-card-body">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Team</th>
+                                <th>Manager</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var employee in filteredEmployees)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong>@employee.Name</strong>
+                                    </td>
+                                    <td>@employee.Email</td>
+                                    <td>
+                                        <span class="badge @GetRoleBadgeClass(employee.Role)">
+                                            @employee.Role
+                                        </span>
+                                    </td>
+                                    <td>@(employee.TeamName ?? "-")</td>
+                                    <td>@(employee.ManagerName ?? "-")</td>
+                                    <td>
+                                        <span class="badge @GetStatusBadgeClass(employee.Status)">
+                                            @employee.Status
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button class="btn btn-outline-primary" @onclick="() => ViewEmployee(employee.Id)" title="View Details">
+                                                <i class="bi bi-eye"></i> View
+                                            </button>
+                                            @if (employee.Status == EmploymentStatus.Active)
+                                            {
+                                                <button class="btn btn-outline-danger" @onclick="() => DeactivateEmployee(employee)" title="Deactivate Employee">
+                                                    <i class="bi bi-x-circle"></i> Deactivate
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-outline-success" @onclick="() => ActivateEmployee(employee)" title="Activate Employee">
+                                                    <i class="bi bi-check-circle"></i> Activate
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-footer">
+                    <small class="text-muted">Showing @filteredEmployees.Count() of @allEmployees.Count employees</small>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+@code {
+    private List<EmployeeDto> allEmployees = new();
+    private List<EmployeeDto> filteredEmployees = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string? successMessage;
+    private string searchTerm = string.Empty;
+    private string selectedRole = string.Empty;
+    private string selectedStatus = string.Empty;
+    private Guid currentUserId;
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out currentUserId))
+            {
+                errorMessage = "Unable to identify current user";
+                return;
+            }
+            await LoadEmployees();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading employees: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    private async Task LoadEmployees()
+    {
+        var employees = await EmployeeService.GetAllEmployeesAsync(currentUserId);
+        allEmployees = employees.ToList();
+        FilterEmployees();
+    }
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? string.Empty;
+        FilterEmployees();
+    }
+    private void OnRoleChanged(ChangeEventArgs e)
+    {
+        selectedRole = e.Value?.ToString() ?? string.Empty;
+        FilterEmployees();
+    }
+    private void OnStatusChanged(ChangeEventArgs e)
+    {
+        selectedStatus = e.Value?.ToString() ?? string.Empty;
+        FilterEmployees();
+    }
+    private void FilterEmployees()
+    {
+        var filtered = allEmployees.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var search = searchTerm.ToLower();
+            filtered = filtered.Where(e => 
+                e.Name.ToLower().Contains(search) || 
+                e.Email.ToLower().Contains(search));
+        }
+        if (!string.IsNullOrEmpty(selectedRole) && Enum.TryParse<Role>(selectedRole, out var role))
+        {
+            filtered = filtered.Where(e => e.Role == role);
+        }
+        if (!string.IsNullOrEmpty(selectedStatus) && Enum.TryParse<EmploymentStatus>(selectedStatus, out var status))
+        {
+            filtered = filtered.Where(e => e.Status == status);
+        }
+        filteredEmployees = filtered.ToList();
+    }
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        selectedRole = string.Empty;
+        selectedStatus = string.Empty;
+        FilterEmployees();
+    }
+    private void ViewEmployee(Guid employeeId)
+    {
+        Navigation.NavigateTo($"/profile/{employeeId}");
+    }
+    private async Task DeactivateEmployee(EmployeeDto employee)
+    {
+        try
+        {
+            await EmployeeService.DeactivateEmployeeAsync(employee.Id, currentUserId);
+            successMessage = $"{employee.Name} has been deactivated successfully.";
+            errorMessage = null;
+            await LoadEmployees();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deactivating employee: {ex.Message}";
+            successMessage = null;
+        }
+    }
+    private async Task ActivateEmployee(EmployeeDto employee)
+    {
+        try
+        {
+            await EmployeeService.ActivateEmployeeAsync(employee.Id, currentUserId);
+            successMessage = $"{employee.Name} has been activated successfully.";
+            errorMessage = null;
+            await LoadEmployees();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error activating employee: {ex.Message}";
+            successMessage = null;
+        }
+    }
+    private string GetRoleBadgeClass(Role role)
+    {
+        return role switch
+        {
+            Role.HR => "bg-danger",
+            Role.Manager => "bg-primary",
+            Role.Employee => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+    private string GetStatusBadgeClass(EmploymentStatus status)
+    {
+        return status switch
+        {
+            EmploymentStatus.Active => "bg-success",
+            EmploymentStatus.Inactive => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+}

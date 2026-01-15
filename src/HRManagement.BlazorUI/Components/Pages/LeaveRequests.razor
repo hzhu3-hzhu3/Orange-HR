@@ -1,0 +1,114 @@
+@page "/leave-requests"
+@rendermode InteractiveServer
+@using HRManagement.Application.Interfaces
+@using HRManagement.Domain.Enums
+@using System.Security.Claims
+@attribute [Authorize]
+@inject ILeaveRequestService LeaveRequestService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+<PageTitle>Leave Requests - HR Management</PageTitle>
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="bi bi-calendar-check"></i> My Leave Requests</h1>
+        </div>
+        <div>
+            <a href="/leave-requests/new" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> New Request
+            </a>
+        </div>
+    </div>
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (!leaveRequests.Any())
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> You haven't submitted any leave requests yet.
+        </div>
+    }
+    else
+    {
+        <div class="content-card">
+            <div class="content-card-body">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Days</th>
+                                <th>Reason</th>
+                                <th>Status</th>
+                                <th>Submitted</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var request in leaveRequests)
+                            {
+                                <tr>
+                                    <td>@request.StartDate.ToString("MMM dd, yyyy")</td>
+                                    <td>@request.EndDate.ToString("MMM dd, yyyy")</td>
+                                    <td>@((request.EndDate - request.StartDate).Days + 1)</td>
+                                    <td>@request.Reason</td>
+                                    <td>
+                                        <span class="badge @GetStatusBadgeClass(request.Status)">
+                                            @request.Status
+                                        </span>
+                                    </td>
+                                    <td>@request.SubmittedAt.ToString("MMM dd, yyyy")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+@code {
+    private List<Application.DTOs.LeaveRequestDto> leaveRequests = new();
+    private bool isLoading = true;
+    private Guid currentUserId;
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (Guid.TryParse(userIdClaim, out var userId))
+                {
+                    currentUserId = userId;
+                    leaveRequests = (await LeaveRequestService.GetEmployeeRequestsAsync(currentUserId)).ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading leave requests: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    private string GetStatusBadgeClass(RequestStatus status)
+    {
+        return status switch
+        {
+            RequestStatus.Pending => "bg-warning",
+            RequestStatus.Approved => "bg-success",
+            RequestStatus.Rejected => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+}

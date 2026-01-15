@@ -1,0 +1,228 @@
+@page "/team"
+@rendermode InteractiveServer
+@using HRManagement.Application.DTOs
+@using HRManagement.Application.Interfaces
+@using HRManagement.Domain.Enums
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@attribute [Authorize(Roles = "Manager,HR")]
+@inject IEmployeeService EmployeeService
+@inject ILeaveRequestService LeaveRequestService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+<PageTitle>My Team</PageTitle>
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="bi bi-people"></i> My Team</h1>
+            <p class="page-subtitle">View and manage your team members</p>
+        </div>
+    </div>
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading team members...</p>
+        </div>
+    }
+    else if (teamMembers == null || !teamMembers.Any())
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>You don't have any team members yet.
+        </div>
+    }
+    else
+    {
+        <!-- Team Summary Cards -->
+        <div class="stats-grid mb-4">
+            <div class="stat-card">
+                <i class="bi bi-people-fill text-primary" style="font-size: 2rem;"></i>
+                <div class="stat-value mt-2">@teamMembers.Count</div>
+                <div class="stat-label">Team Members</div>
+            </div>
+            <div class="stat-card">
+                <i class="bi bi-check-circle-fill text-success" style="font-size: 2rem;"></i>
+                <div class="stat-value mt-2">@activeMembers</div>
+                <div class="stat-label">Active</div>
+            </div>
+            <div class="stat-card">
+                <i class="bi bi-calendar-x text-warning" style="font-size: 2rem;"></i>
+                <div class="stat-value mt-2">@onLeaveToday</div>
+                <div class="stat-label">On Leave Today</div>
+            </div>
+            <div class="stat-card">
+                <i class="bi bi-hourglass-split text-info" style="font-size: 2rem;"></i>
+                <div class="stat-value mt-2">@pendingRequests</div>
+                <div class="stat-label">Pending Approvals</div>
+            </div>
+        </div>
+        <!-- Team Members Table -->
+        <div class="content-card">
+            <div class="content-card-header">
+                <h3 class="content-card-title">Team Members</h3>
+            </div>
+            <div class="content-card-body">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Leave Balance</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var member in teamMembers)
+                            {
+                                var balance = teamBalances.FirstOrDefault(b => b.EmployeeId == member.Id);
+                                <tr>
+                                    <td>
+                                        <strong>@member.Name</strong>
+                                    </td>
+                                    <td>@member.Email</td>
+                                    <td>
+                                        <span class="badge @GetRoleBadgeClass(member.Role)">
+                                            @member.Role
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge @GetStatusBadgeClass(member.Status)">
+                                            @member.Status
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (balance != null)
+                                        {
+                                            <div class="d-flex align-items-center">
+                                                <small class="me-2">@balance.RemainingDays / @balance.TotalDays days</small>
+                                                <div class="progress flex-grow-1" style="height: 8px; width: 100px;">
+                                                    <div class="progress-bar @GetBalanceProgressClass(balance)" 
+                                                         role="progressbar" 
+                                                         style="width: @GetBalancePercentage(balance)%">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewMember(member.Id)">
+                                            <i class="bi bi-eye"></i> View
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+@code {
+    private List<EmployeeDto> teamMembers = new();
+    private List<LeaveBalanceDto> teamBalances = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+    private Guid currentUserId;
+    private int activeMembers = 0;
+    private int onLeaveToday = 0;
+    private int pendingRequests = 0;
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out currentUserId))
+            {
+                errorMessage = "Unable to identify current user";
+                return;
+            }
+            await LoadTeamMembers();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading team: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    private async Task LoadTeamMembers()
+    {
+        var members = await EmployeeService.GetDirectReportsAsync(currentUserId);
+        teamMembers = members.ToList();
+        activeMembers = teamMembers.Count(m => m.Status == EmploymentStatus.Active);
+        var balancesList = new List<LeaveBalanceDto>();
+        foreach (var member in teamMembers)
+        {
+            try
+            {
+                var balance = await LeaveRequestService.GetEmployeeLeaveBalanceAsync(member.Id);
+                if (balance != null)
+                {
+                    balancesList.Add(balance);
+                }
+            }
+            catch
+            {
+            }
+        }
+        teamBalances = balancesList;
+        onLeaveToday = 0;
+        pendingRequests = 0;
+    }
+    private void ViewMember(Guid memberId)
+    {
+        Navigation.NavigateTo($"/profile/{memberId}");
+    }
+    private string GetRoleBadgeClass(Role role)
+    {
+        return role switch
+        {
+            Role.HR => "bg-danger",
+            Role.Manager => "bg-primary",
+            Role.Employee => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+    private string GetStatusBadgeClass(EmploymentStatus status)
+    {
+        return status switch
+        {
+            EmploymentStatus.Active => "bg-success",
+            EmploymentStatus.Inactive => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+    private double GetBalancePercentage(LeaveBalanceDto balance)
+    {
+        if (balance.TotalDays == 0) return 0;
+        return (double)balance.RemainingDays / balance.TotalDays * 100;
+    }
+    private string GetBalanceProgressClass(LeaveBalanceDto balance)
+    {
+        var percentage = GetBalancePercentage(balance);
+        if (percentage > 50) return "bg-success";
+        if (percentage > 25) return "bg-warning";
+        return "bg-danger";
+    }
+}
