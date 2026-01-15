@@ -32,7 +32,7 @@ if (string.IsNullOrEmpty(connectionString))
 {
     throw new InvalidOperationException("Database connection string 'DefaultConnection' not found.");
 }
-var isPostgres = connectionString.Contains("Host=") || connectionString.Contains("Server=") && connectionString.Contains("Port=");
+var isPostgres = connectionString.Contains("Host=");
 builder.Services.AddDbContext<HRManagementDbContext>(options =>
 {
     if (isPostgres)
@@ -86,9 +86,8 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<AuthenticationStateProvider, HRManagement.BlazorUI.IdentityRevalidatingAuthenticationStateProvider>();
 var app = builder.Build();
-if (app.Environment.IsDevelopment())
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var services = scope.ServiceProvider;
     var logger = services.GetRequiredService<ILogger<Program>>();
     try
