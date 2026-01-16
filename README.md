@@ -2,9 +2,10 @@
 
 A modern, full-stack HR management system built with .NET 8 and Blazor Server, featuring role-based access control, leave request workflows, and team management.
 
-## 🚀 Live Demo
+## Live Demo
 
-**Coming Soon** - Deploy to Railway in 5 minutes! See [QUICKSTART.md](./QUICKSTART.md)
+**Live Demo**: https://orange-hr-production.up.railway.app/
+
 
 ## Features
 
@@ -27,7 +28,7 @@ A modern, full-stack HR management system built with .NET 8 and Blazor Server, f
 ### Frontend
 - Blazor Server
 - Bootstrap 5
-- Custom CSS theme
+- CSS
 
 ### Architecture
 - Clean Architecture
@@ -46,7 +47,7 @@ A modern, full-stack HR management system built with .NET 8 and Blazor Server, f
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/orange-hr-management.git
+git clone https://github.com/hzhu3-hzhu3/Orange-HR/tree/main
 cd orange-hr-management
 ```
 
@@ -141,10 +142,8 @@ dotnet test
 
 ### Database Migrations
 ```bash
-# Add new migration
 dotnet ef migrations add MigrationName --project src/HRManagement.Infrastructure
 
-# Update database
 dotnet ef database update --project src/HRManagement.Infrastructure
 ```
 
@@ -176,7 +175,7 @@ git push -u origin main
    - Railway will automatically set the `DATABASE_URL` environment variable
 
 4. **Configure Environment Variables**
-   Railway will automatically use the PostgreSQL connection string. No additional configuration needed!
+   Railway will automatically use the PostgreSQL connection string. 
 
 5. **Access Your App**
    - Railway will provide a public URL (e.g., `https://your-app.up.railway.app`)
@@ -197,4 +196,4 @@ This project is licensed under the MIT License.
 
 ## Contact
 
-For questions or support, please open an issue on GitHub.
+For questions or support, please open an issue on GitHub : )
