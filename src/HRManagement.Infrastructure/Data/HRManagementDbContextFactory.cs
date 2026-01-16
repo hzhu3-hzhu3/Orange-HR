@@ -6,7 +6,7 @@ public class HRManagementDbContextFactory : IDesignTimeDbContextFactory<HRManage
     public HRManagementDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<HRManagementDbContext>();
-        optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=HRManagementDb;Trusted_Connection=True;MultipleActiveResultSets=true");
+        optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=HRManagementDb;Username=postgres;Password=postgres");
         return new HRManagementDbContext(optionsBuilder.Options);
     }
 }
